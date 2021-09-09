@@ -1,5 +1,5 @@
 from app.exceptions.post_exceptions import PostNotFound
-from pymongo import MongoClient
+from pymongo import MongoClient, ReturnDocument
 from dotenv import load_dotenv
 from datetime import datetime
 from os import getenv
@@ -14,14 +14,14 @@ db = client.kenzie
 
 
 class Post():
-    def __init__(self, title: str, content: str, tags: str, author: str) -> None:
-        self.id = 1
+    def __init__(self, title: str, content: str, tags: str, author: str, created_at: datetime, updated_at: datetime, id=1) -> None:
+        self.id = id
         self.title = title
         self.content = content
         self.author = author
         self.tags = tags
-        self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.created_at = created_at
+        self.updated_at = updated_at
 
     def save_post(self):
         last_post = list(db.posts.find().sort("_id", -1).limit(1))
@@ -40,14 +40,17 @@ class Post():
         return new_post
 
     def update(self, update_data: object):
-        post = db.posts.find_one_and_update({"id": self.id}, update_data)
+
+        post = db.posts.find_one_and_update({"id": self.id}, {"$set": update_data}, return_document=ReturnDocument.AFTER)
 
         if not post:
             raise PostNotFound
-        
+
         del post["_id"]
 
-        return post
+        new_post = Post(post["title"], post["content"], post["tags"], post["author"], post["created_at"], post["updated_at"], self.id)
+
+        return new_post.__dict__
 
     @staticmethod
     def get_posts():
@@ -64,10 +67,12 @@ class Post():
 
         if not post:
             raise PostNotFound
-
+        
         del post["_id"]
 
-        return post
+        new_post = Post(post["title"], post["content"], post["tags"], post["author"], post["created_at"], post["updated_at"], id)
+
+        return new_post
 
     @staticmethod
     def delete_post(id: int):

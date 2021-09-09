@@ -1,4 +1,4 @@
-from app.exceptions.post_exceptions import PostNotFound
+from app.exceptions.post_exceptions import InvalidKeys, PostNotFound
 from flask import Flask, request, jsonify
 from app.models.post_model import Post
 from datetime import datetime
@@ -13,7 +13,7 @@ def init_app(app: Flask):
     def read_post_by_id(id: int):
         try:
             post = Post.get_post_by_id(id)
-            return jsonify(post), 200
+            return post.__dict__, 200
 
         except PostNotFound:
             return {"msg": "Post Not found."}, 404
@@ -21,6 +21,8 @@ def init_app(app: Flask):
     @app.post('/posts')
     def create_post():
         data = request.json
+        data["created_at"] = datetime.utcnow()
+        data["updated_at"] = datetime.utcnow()
 
         try:
             post = Post(**data)
@@ -44,8 +46,17 @@ def init_app(app: Flask):
         try:
             request.json["updated_at"] = datetime.utcnow()
             post = Post.get_post_by_id(id)
-            post.update(request.json)
+
+            for key in request.json:
+                if not key in post.__dict__:
+                    raise InvalidKeys
+
+            post = post.update(request.json)
+
             return post, 200
-        
+
         except PostNotFound:
             return {"msg": "Post Not found."}, 404
+
+        except InvalidKeys:
+            return {"msg": "Invalid key(s)."}, 400
